@@ -238,6 +238,7 @@ button{cursor:pointer}
     <button class="mode-btn" id="modeChat" onclick="setMode('chat')">&#128172; Assistant IA</button>
     <button class="mode-btn" id="modeSettings" onclick="setMode('settings')">&#9881; R&eacute;glages</button>
     <button class="adm-pdf-btn" onclick="openPdfModal()">&#8681; PDF A5</button>
+    <button class="adm-pdf-btn" id="btn-accords-sync" onclick="updateAllAccords()" style="background:#FEF9EE;border-color:var(--gold);color:var(--gold)">&#127860; Accords</button>
     <button class="adm-back" onclick="showClient()">&larr; Carte</button>
   </div>
 
@@ -587,6 +588,63 @@ function renderEdit(i){
 }
 
 function getTva(it){return it.tva??(it.nonAlcool?10:20)}
+
+async function updateAllAccords(){
+  if(!API_KEY){toast('Clé API requise — voir Réglages');return;}
+  const btn=document.getElementById('btn-accords-sync');
+  btn.disabled=true;btn.textContent='⏳ Chargement…';
+  try{
+    const carteData=await sbLoad('db-carte');
+    if(!carteData){toast('DB-Carte non disponible');return;}
+    const dishes=[];
+    (carteData.sequences||[]).forEach(seq=>{
+      (seq.dishes||[]).forEach(d=>{
+        if(d.name) dishes.push({
+          name:d.name,
+          desc:(d.description||'').slice(0,100),
+          ingredients:(d.mepPrincipal||[]).map(r=>r.label).filter(Boolean).join(', ')
+        });
+      });
+    });
+    if(!dishes.length){toast('Aucun plat dans DB-Carte');return;}
+    const wines=[];
+    TABS.forEach(k=>{
+      const tab=CAT[k];if(!tab)return;
+      tab.sections.forEach(sec=>{
+        const lists=sec.subsections?sec.subsections.map(s=>s.items):[sec.items];
+        lists.forEach(items=>items.forEach(it=>{
+          if(it.n) wines.push({id:it.id,n:it.n+(it.v?' '+it.v:''),region:it.region||'',cepage:it.cepage||'',note:(it.note||'').slice(0,100)});
+        }));
+      });
+    });
+    btn.textContent='⏳ Analyse IA…';
+    const prompt=`Tu es sommelier expert à L'Atelier Privé de David Boyer (restaurant gastronomique Michelin).
+
+Plats disponibles (${dishes.length}) :
+${dishes.map(d=>`${d.name}${d.desc?' — '+d.desc:''}${d.ingredients?' | '+d.ingredients:''}`).join('\n')}
+
+Carte des vins (${wines.length} références) :
+${wines.map(w=>`${w.id} | ${w.n}${w.region?' | '+w.region:''}${w.cepage?' | '+w.cepage:''}${w.note?' | '+w.note:''}`).join('\n')}
+
+Pour chaque vin, identifie les plats (0 à 3 max) qui s'accordent bien. Pour chaque accord, écris une phrase courte et précise (max 90 caractères) expliquant l'harmonie.
+Si aucun plat ne convient à un vin, ne l'inclus pas.
+Réponds UNIQUEMENT en JSON valide sans markdown : [{"id":"wine_id","accords":[{"platName":"nom exact du plat","accord":"texte"}]}]`;
+    const aiResp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:apiH(),body:JSON.stringify({model:'claude-opus-4-7',max_tokens:4096,system:'Réponds uniquement en JSON valide, sans markdown.',messages:[{role:'user',content:prompt}]})});
+    if(!aiResp.ok)throw new Error('API '+aiResp.status);
+    const aiJson=await aiResp.json();
+    const raw=aiJson.content?.[0]?.text||'';
+    const result=JSON.parse(raw.replace(/```json|```/g,'').trim());
+    const ts=Date.now();let updated=0;
+    result.forEach(({id,accords})=>{
+      const it=findItem(id);if(!it||!accords?.length)return;
+      it.platAccords=accords.map(a=>({platName:a.platName,accord:a.accord,date:ts}));
+      updated++;
+    });
+    CAT._updatedAt=ts;save();renderAll();
+    toast(`✓ ${updated} vin${updated>1?'s':''} mis à jour`);
+  }catch(e){toast('Erreur — réessaie');console.error(e);}
+  finally{btn.disabled=false;btn.textContent='🍽 Accords';}
+}
 function savePlatAccord(wineId,pIdx,newText){
   ['aperitifs','vins','digestifs'].forEach(k=>{
     const tab=CAT[k];if(!tab)return;
