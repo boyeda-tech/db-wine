@@ -108,6 +108,13 @@ button{cursor:pointer}
 .e-tva{width:60px;padding:4px 4px;border:1px solid var(--border);border-radius:5px;font-size:12px;color:var(--txt2);background:var(--bg);cursor:pointer}
 .e-tva:focus{outline:none;border-color:var(--gold)}
 .e-unit{font-size:11px;color:var(--txt3)}
+.e-stk{display:flex;align-items:center;gap:2px;flex-shrink:0}
+.e-stk-btn{width:22px;height:26px;padding:0;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--txt2);font-size:14px;cursor:pointer;line-height:1}
+.e-stk-btn:hover{border-color:var(--gold);color:var(--gold)}
+.e-stk-inp{width:34px;text-align:center;padding:3px 2px;border:1px solid var(--border);border-radius:5px;font-size:13px;background:var(--bg);color:var(--txt);-moz-appearance:textfield}
+.e-stk-inp::-webkit-inner-spin-button,.e-stk-inp::-webkit-outer-spin-button{display:none}
+.e-stk-inp:focus{outline:none;border-color:var(--gold)}
+.e-stk-inp.rupture{border-color:#e53935;color:#e53935}
 .tog{position:relative;width:38px;height:22px;flex-shrink:0}
 .tog input{opacity:0;width:0;height:0;position:absolute}
 .tog-sl{position:absolute;inset:0;background:#D0CEC8;border-radius:22px;transition:.25s;cursor:pointer}
@@ -395,8 +402,8 @@ function renderTabHtml(tab){
   let h='';
   tab.sections.forEach(sec=>{
     h+=`<div class="sec-hdr"><span class="sec-lbl">${sec.title}</span><div class="sec-line"></div></div>`;
-    if(sec.subsections){sec.subsections.forEach(sub=>{h+=`<div class="sub-sec">${sub.title}</div>`;sub.items.forEach(it=>{h+=renderItem(it)})})}
-    else{sec.items.forEach(it=>{h+=renderItem(it)})}
+    if(sec.subsections){sec.subsections.forEach(sub=>{h+=`<div class="sub-sec">${sub.title}</div>`;sub.items.filter(it=>it.stock!==0).forEach(it=>{h+=renderItem(it)})})}
+    else{sec.items.filter(it=>it.stock!==0).forEach(it=>{h+=renderItem(it)})}
   });
   h+=`<div class="legal-box"><div class="legal-warn">L'abus d'alcool est dangereux pour la santé — À consommer avec modération.</div><div class="legal-minor">La vente d'alcool est interdite aux mineurs de moins de 18 ans.</div></div>`;
   return h;
@@ -565,6 +572,7 @@ function renderEdit(i){
           <input class="e-price" type="number" value="${px}" step="0.5" min="0" onchange="updatePrice('${it.id}',this.value)">
           <span class="e-unit">€</span>
           <select class="e-tva" onchange="updateTva('${it.id}',this.value)"><option value="20" ${getTva(it)===20?'selected':''}>20%</option><option value="10" ${getTva(it)===10?'selected':''}>10%</option><option value="5.5" ${getTva(it)===5.5?'selected':''}>5,5%</option></select>
+          <div class="e-stk"><button class="e-stk-btn" onclick="updateStock('${it.id}',-1)">−</button><input class="e-stk-inp${it.stock===0?' rupture':''}" type="number" min="0" step="1" value="${it.stock??''}" placeholder="∞" onchange="setStock('${it.id}',this.value)"></div>
           <label class="tog"><input type="checkbox" ${it.dispo?'checked':''} onchange="updateDispo('${it.id}',this.checked)"><span class="tog-sl"></span></label>
           <button class="btn-del" onclick="delItem('${it.id}')" title="Supprimer">×</button>
         </div>`;
@@ -591,6 +599,8 @@ function savePlatAccord(wineId,pIdx,newText){
 function updatePrice(id,val){const it=findItem(id);if(it){it.p=parseFloat(val)||it.p;markDirty()}}
 function updateDispo(id,val){const it=findItem(id);if(it){it.dispo=val;markDirty()}}
 function updateTva(id,val){const it=findItem(id);if(it){it.tva=parseFloat(val);markDirty();renderSettings();renderEdit(editTab)}}
+function updateStock(id,delta){const it=findItem(id);if(!it)return;if(it.stock===null||it.stock===undefined){if(delta<0)it.stock=0;else return;}else{it.stock=Math.max(0,it.stock+delta);}save();renderAll();renderEdit(editTab);}
+function setStock(id,val){const it=findItem(id);if(!it)return;it.stock=val===''?null:Math.max(0,parseInt(val)||0);save();renderAll();renderEdit(editTab);}
 function markDirty(){dirty=true;document.getElementById('saveFab').classList.add('show')}
 function saveChanges(){save();renderAll();dirty=false;document.getElementById('saveFab').classList.remove('show');toast('Modifications enregistrées ✓')}
 
@@ -657,7 +667,7 @@ async function saveNewItem(){
     fmt:document.getElementById('ff').value.trim()||null,
     p:prix,degre:document.getElementById('fd').value.trim()||null,
     region:null,cepage:null,prod:null,note:null,accord:null,tourbe:null,
-    tva:parseFloat(document.getElementById('ftva').value)||20,dispo:true
+    tva:parseFloat(document.getElementById('ftva').value)||20,stock:null,dispo:true
   };
   const t=JSON.parse(document.getElementById('fsec').value);
   const tab=CAT[t.key];const sec=tab.sections[t.si];
@@ -903,7 +913,7 @@ function execAction(a){
   else if(a.type==='add'){
     const tabKey=a.tab||'vins';const tab=CAT[tabKey];if(!tab)return;
     let sec=tab.sections.find(s=>s.id===a.secId)||tab.sections[0];if(!sec)return;
-    const newItem={id:'item-'+Date.now(),n:a.nom||'Nouveau',v:a.v||null,fmt:a.fmt||null,p:parseFloat(a.p)||0,degre:null,region:null,cepage:null,prod:null,note:null,accord:null,tourbe:null,tva:parseFloat(a.tva)||20,dispo:true};
+    const newItem={id:'item-'+Date.now(),n:a.nom||'Nouveau',v:a.v||null,fmt:a.fmt||null,p:parseFloat(a.p)||0,degre:null,region:null,cepage:null,prod:null,note:null,accord:null,tourbe:null,tva:parseFloat(a.tva)||20,stock:null,dispo:true};
     if(sec.subsections&&sec.subsections.length>0){sec.subsections[0].items.push(newItem);}else{sec.items.push(newItem);}
     save();renderAll();renderEdit(editTab);
     addMsg('sys','✓ "'+newItem.n+'" ajouté. Enrichissement de la fiche en cours...');
