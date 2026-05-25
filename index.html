@@ -421,6 +421,7 @@ function renderFiche(it){
   if(it.tourbe!=null){const cls=it.tourbe.includes('Non')?'badge-n':'badge-t';h+=`<div class="fi"><label>Tourbé</label><span class="badge ${cls}">${it.tourbe}</span></div>`}
   if(it.note)h+=`<div class="fi-note">${it.note}</div>`;
   if(it.accord)h+=`<div class="fi-accord"><strong>Accord :</strong> ${it.accord}</div>`;
+  if(it.platAccords?.length){h+=`<div class="fi-accord" style="margin-top:6px"><strong>À la carte :</strong><ul style="margin:4px 0 0 1.2em;padding:0;list-style:disc">${it.platAccords.map(p=>`<li style="margin-bottom:3px"><em>${p.platName}</em> — ${p.accord}</li>`).join('')}</ul></div>`;}
   h+=`</div>`;
   return h;
 }
