@@ -103,6 +103,8 @@ button{cursor:pointer}
 .e-vin{font-size:11px;color:var(--txt2);margin-top:1px}
 .e-price{width:58px;text-align:right;padding:4px 6px;border:1px solid var(--border);border-radius:5px;font-size:14px;font-family:var(--serif);color:var(--gold);background:var(--bg)}
 .e-price:focus{outline:none;border-color:var(--gold)}
+.e-tva{width:60px;padding:4px 4px;border:1px solid var(--border);border-radius:5px;font-size:12px;color:var(--txt2);background:var(--bg);cursor:pointer}
+.e-tva:focus{outline:none;border-color:var(--gold)}
 .e-unit{font-size:11px;color:var(--txt3)}
 .tog{position:relative;width:38px;height:22px;flex-shrink:0}
 .tog input{opacity:0;width:0;height:0;position:absolute}
@@ -331,10 +333,7 @@ button{cursor:pointer}
    <div class="frow"><label>Degr&eacute; alcool</label><input id="fd" placeholder="13% vol"></div>
   </div>
   <div class="frow"><label>Section *</label><select id="fsec"></select></div>
-  <div class="frow" style="align-items:center;gap:10px">
-   <input type="checkbox" id="fna" style="width:16px;height:16px;accent-color:var(--gold)">
-   <label style="font-size:12px;color:var(--txt2);cursor:pointer" for="fna">Non alcoolisé (TVA 10% au lieu de 20%)</label>
-  </div>
+  <div class="frow"><label>TVA applicable</label><select id="ftva"><option value="20">20% — Alcool</option><option value="10">10% — Non alcoolisé sur place</option><option value="5.5">5,5% — Non alcoolisé à emporter</option></select></div>
   <div class="ai-status" id="aiSt"></div>
   <div class="modal-btns">
    <button class="btn-cancel" onclick="closeAdd()">Annuler</button>
@@ -529,9 +528,10 @@ function renderSettings(){
       lists.forEach(items=>items.forEach(it=>{
         if(it.p){
           const px=it.p%1===0?it.p:parseFloat(it.p).toFixed(2);
-          const rate=it.nonAlcool?10:20;
+          const rate=getTva(it);
           const ht=(it.p/(1+rate/100)).toFixed(2);
-          rows.push(`<tr><td>${it.n}${it.v?' '+it.v:''}</td><td>${px} €</td><td>${rate}%</td><td>${ht} €</td></tr>`);
+          const sel=`<select class="e-tva" onchange="updateTva('${it.id}',this.value)"><option value="20" ${rate===20?'selected':''}>20%</option><option value="10" ${rate===10?'selected':''}>10%</option><option value="5.5" ${rate===5.5?'selected':''}>5,5%</option></select>`;
+          rows.push(`<tr><td>${it.n}${it.v?' '+it.v:''}</td><td>${px} €</td><td>${sel}</td><td>${ht} €</td></tr>`);
         }
       }));
     });
@@ -561,6 +561,7 @@ function renderEdit(i){
           <div class="e-info"><div class="e-name" title="${it.n}">${it.n}</div>${meta?`<div class="e-vin">${meta}</div>`:''}</div>
           <input class="e-price" type="number" value="${px}" step="0.5" min="0" onchange="updatePrice('${it.id}',this.value)">
           <span class="e-unit">€</span>
+          <select class="e-tva" onchange="updateTva('${it.id}',this.value)"><option value="20" ${getTva(it)===20?'selected':''}>20%</option><option value="10" ${getTva(it)===10?'selected':''}>10%</option><option value="5.5" ${getTva(it)===5.5?'selected':''}>5,5%</option></select>
           <label class="tog"><input type="checkbox" ${it.dispo?'checked':''} onchange="updateDispo('${it.id}',this.checked)"><span class="tog-sl"></span></label>
           <button class="btn-del" onclick="delItem('${it.id}')" title="Supprimer">×</button>
         </div>`;
@@ -574,8 +575,10 @@ function renderEdit(i){
   document.getElementById('editList').innerHTML=h;
 }
 
+function getTva(it){return it.tva??(it.nonAlcool?10:20)}
 function updatePrice(id,val){const it=findItem(id);if(it){it.p=parseFloat(val)||it.p;markDirty()}}
 function updateDispo(id,val){const it=findItem(id);if(it){it.dispo=val;markDirty()}}
+function updateTva(id,val){const it=findItem(id);if(it){it.tva=parseFloat(val);markDirty();renderSettings()}}
 function markDirty(){dirty=true;document.getElementById('saveFab').classList.add('show')}
 function saveChanges(){save();renderAll();dirty=false;document.getElementById('saveFab').classList.remove('show');toast('Modifications enregistrées ✓')}
 
@@ -642,7 +645,7 @@ async function saveNewItem(){
     fmt:document.getElementById('ff').value.trim()||null,
     p:prix,degre:document.getElementById('fd').value.trim()||null,
     region:null,cepage:null,prod:null,note:null,accord:null,tourbe:null,
-    nonAlcool:document.getElementById('fna').checked,dispo:true
+    tva:parseFloat(document.getElementById('ftva').value)||20,dispo:true
   };
   const t=JSON.parse(document.getElementById('fsec').value);
   const tab=CAT[t.key];const sec=tab.sections[t.si];
@@ -888,7 +891,7 @@ function execAction(a){
   else if(a.type==='add'){
     const tabKey=a.tab||'vins';const tab=CAT[tabKey];if(!tab)return;
     let sec=tab.sections.find(s=>s.id===a.secId)||tab.sections[0];if(!sec)return;
-    const newItem={id:'item-'+Date.now(),n:a.nom||'Nouveau',v:a.v||null,fmt:a.fmt||null,p:parseFloat(a.p)||0,degre:null,region:null,cepage:null,prod:null,note:null,accord:null,tourbe:null,nonAlcool:a.nonAlcool||false,dispo:true};
+    const newItem={id:'item-'+Date.now(),n:a.nom||'Nouveau',v:a.v||null,fmt:a.fmt||null,p:parseFloat(a.p)||0,degre:null,region:null,cepage:null,prod:null,note:null,accord:null,tourbe:null,tva:parseFloat(a.tva)||20,dispo:true};
     if(sec.subsections&&sec.subsections.length>0){sec.subsections[0].items.push(newItem);}else{sec.items.push(newItem);}
     save();renderAll();renderEdit(editTab);
     addMsg('sys','✓ "'+newItem.n+'" ajouté. Enrichissement de la fiche en cours...');
