@@ -641,6 +641,8 @@ Réponds UNIQUEMENT en JSON valide sans markdown : [{"id":"wine_id","accords":[{
       updated++;
     });
     CAT._updatedAt=ts;save();renderAll();
+    localStorage.setItem('accords_synced_at',String(ts));
+    btn.style.background='#FEF9EE';btn.style.color='var(--gold)';btn.style.borderColor='var(--gold)';btn.title='';
     toast(`✓ ${updated} vin${updated>1?'s':''} mis à jour`);
   }catch(e){toast('Erreur — réessaie');console.error(e);}
   finally{btn.disabled=false;btn.textContent='🍽 Accords';}
@@ -1082,6 +1084,12 @@ function apiH(){
   if(sbPass){PASS=sbPass;localStorage.setItem('db_wine_pass',sbPass);}
   loadKey();renderAll();
   if(location.search.includes('admin'))showLogin();
+  const carteTs=await sbLoadSetting('carte_last_updated');
+  const syncTs=parseInt(localStorage.getItem('accords_synced_at')||'0');
+  if(carteTs&&parseInt(carteTs)>syncTs){
+    const btn=document.getElementById('btn-accords-sync');
+    if(btn){btn.style.background='var(--gold)';btn.style.color='#fff';btn.style.borderColor='var(--gold)';btn.title='DB-Carte a été modifié — mettre à jour les accords';}
+  }
 })();
 </script>
 </body>
