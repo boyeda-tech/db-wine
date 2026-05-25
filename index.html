@@ -521,11 +521,13 @@ function renderSettings(){
   const rows=[];
   TABS.forEach(t=>{
     CAT[t].sections.forEach(sec=>{
-      sec.items.forEach(it=>{
-        if(it.price){
-          rows.push(`<tr><td>${it.name}${it.vintage?' '+it.vintage:''}</td><td>${it.price} €</td><td>${(it.price/1.2).toFixed(2)} €</td><td>${(it.price/1.1).toFixed(2)} €</td></tr>`);
+      const lists=sec.subsections?sec.subsections.map(s=>s.items):[sec.items];
+      lists.forEach(items=>items.forEach(it=>{
+        if(it.p){
+          const px=it.p%1===0?it.p:parseFloat(it.p).toFixed(2);
+          rows.push(`<tr><td>${it.n}${it.v?' '+it.v:''}</td><td>${px} €</td><td>${(it.p/1.2).toFixed(2)} €</td><td>${(it.p/1.1).toFixed(2)} €</td></tr>`);
         }
-      });
+      }));
     });
   });
   document.getElementById('tva-body').innerHTML=rows.join('')||'<tr><td colspan="4" style="color:var(--txt3);font-style:italic">Aucun article avec prix</td></tr>';
