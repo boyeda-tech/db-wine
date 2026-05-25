@@ -635,11 +635,23 @@ Réponds UNIQUEMENT en JSON valide sans markdown : [{"id":"wine_id","accords":[{
     const raw=aiJson.content?.[0]?.text||'';
     const result=JSON.parse(raw.replace(/```json|```/g,'').trim());
     const ts=Date.now();let updated=0;
+    const dishWineMap={};
     result.forEach(({id,accords})=>{
       const it=findItem(id);if(!it||!accords?.length)return;
       it.platAccords=accords.map(a=>({platName:a.platName,accord:a.accord,date:ts}));
       updated++;
+      accords.forEach(a=>{
+        if(!dishWineMap[a.platName])dishWineMap[a.platName]=[];
+        dishWineMap[a.platName].push({wineName:it.n+(it.v?' '+it.v:''),accord:a.accord});
+      });
     });
+    // Écriture inverse dans DB-Carte
+    (carteData.sequences||[]).forEach(seq=>(seq.dishes||[]).forEach(d=>{
+      if(d.name&&dishWineMap[d.name])d.vinsAccord=dishWineMap[d.name];
+      else if(d.name)d.vinsAccord=[];
+    }));
+    carteData._updatedAt=ts;
+    await sbSave('db-carte',carteData);
     CAT._updatedAt=ts;save();renderAll();
     localStorage.setItem('accords_synced_at',String(ts));
     btn.style.background='#FEF9EE';btn.style.color='var(--gold)';btn.style.borderColor='var(--gold)';btn.title='';
@@ -918,7 +930,7 @@ async function sendMsg(){
     });
     return lines;
   }).join('\n');
-  const sys='Tu es l\'assistant de L\'Atelier Privé (David Boyer, MOF 2023). Tutoiement. Bref. Texte brut.\n\nRÈGLE ABSOLUE N°1 : Toute modification de la carte DOIT inclure une balise <ACTION> dans ta réponse. Sans balise <ACTION>, RIEN ne sera modifié sur la carte. Ne dis jamais \"c\'est fait\" sans avoir inclus la balise <ACTION>.\n\nRÈGLE N°2 : Pour les noms de vins, l\'appellation AOC/AOP passe TOUJOURS en premier. Ex: "Condrieu La Petite Côte — Yves Cuilleron" et non "La Petite Côte Condrieu".\n\nACTIONS disponibles (JSON avec guillemets doubles obligatoires) :\n<ACTION>{"type":"name","id":"item-xxx","nom":"Nouveau nom"}</ACTION>\n<ACTION>{"type":"add_subsection","tab":"vins","secId":"v2","title":"Vallée du Rhône"}</ACTION>\n<ACTION>{"type":"add","tab":"vins","secId":"v2","nom":"Condrieu — Yves Cuilleron","v":"2023","fmt":"75 cl","p":95}</ACTION>\n<ACTION>{"type":"unavail","id":"item-xxx"}</ACTION>\n<ACTION>{"type":"avail","id":"item-xxx"}</ACTION>\n<ACTION>{"type":"price","id":"item-xxx","p":88}</ACTION>\n<ACTION>{"type":"add_section","tab":"vins","title":"Nouvelle section"}</ACTION>\n\nCATALOGUE :\n'+catSum;
+  const sys='Tu es l\'assistant de L\'Atelier Privé (David Boyer, MOF 2023). Tutoiement. Bref. Texte brut.\n\nRÈGLE ABSOLUE N°1 : Toute modification de la carte DOIT inclure une balise <ACTION> dans ta réponse. Sans balise <ACTION>, RIEN ne sera modifié sur la carte. Ne dis jamais \"c\'est fait\" sans avoir inclus la balise <ACTION>.\n\nRÈGLE N°2 : Pour les noms de vins, l\'appellation AOC/AOP passe TOUJOURS en premier. Ex: "Condrieu La Petite Côte — Yves Cuilleron" et non "La Petite Côte Condrieu".\n\nACTIONS disponibles (JSON avec guillemets doubles obligatoires) :\n<ACTION>{"type":"name","id":"item-xxx","nom":"Nouveau nom"}</ACTION>\n<ACTION>{"type":"add_subsection","tab":"vins","secId":"v2","title":"Vallée du Rhône"}</ACTION>\n<ACTION>{"type":"add","tab":"vins","secId":"v2","nom":"Condrieu — Yves Cuilleron","v":"2023","fmt":"75 cl","p":95}</ACTION>\n<ACTION>{"type":"unavail","id":"item-xxx"}</ACTION>\n<ACTION>{"type":"avail","id":"item-xxx"}</ACTION>\n<ACTION>{"type":"price","id":"item-xxx","p":88}</ACTION>\n<ACTION>{"type":"add_section","tab":"vins","title":"Nouvelle section"}</ACTION>\n<ACTION>{"type":"accord","id":"item-xxx","platName":"Nom exact du plat","accord":"Nouvelle phrase d\'accord"}</ACTION>\n<ACTION>{"type":"accord_delete","id":"item-xxx","platName":"Nom exact du plat"}</ACTION>\n\nPour modifier un accord, utilise le type "accord" avec l\'id du vin et le nom exact du plat. Pour supprimer un accord, utilise "accord_delete".\n\nCATALOGUE :\n'+catSum;
   const messages=hist.map(m=>({role:m.role==='agent'?'assistant':'user',content:m.text}));
   try{
     const r=await fetch('https://api.anthropic.com/v1/messages',{
@@ -998,6 +1010,21 @@ function execAction(a){
     const old=it.n;it.n=a.nom;save();renderAll();renderEdit(editTab);
     addMsg('sys','✓ Renommé : "'+old+'" → "'+it.n+'"');
   }
+  else if(a.type==='accord'){
+    const it=findItem(a.id);if(!it)return;
+    if(!Array.isArray(it.platAccords))it.platAccords=[];
+    const idx=it.platAccords.findIndex(p=>p.platName===a.platName);
+    if(idx>=0)it.platAccords[idx].accord=a.accord;
+    else it.platAccords.push({platName:a.platName,accord:a.accord,date:Date.now()});
+    save();renderAll();
+    addMsg('sys','✓ Accord mis à jour : "'+it.n+'" × "'+a.platName+'"');
+  }
+  else if(a.type==='accord_delete'){
+    const it=findItem(a.id);if(!it)return;
+    it.platAccords=(it.platAccords||[]).filter(p=>p.platName!==a.platName);
+    save();renderAll();
+    addMsg('sys','✓ Accord supprimé.');
+  }
 }
 
 function exportCarte(){
@@ -1029,11 +1056,13 @@ function importCarte(){
 }
 
 function findItem(id){
-  for(const tab of Object.values(CAT))
+  for(const t of TABS){
+    const tab=CAT[t];if(!tab)continue;
     for(const sec of tab.sections){
       const items=sec.subsections?sec.subsections.flatMap(s=>s.items):sec.items;
       const f=items.find(i=>i.id===id);if(f)return f;
     }
+  }
   return null;
 }
 
