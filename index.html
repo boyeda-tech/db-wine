@@ -78,6 +78,19 @@ button{cursor:pointer}
 /* EDIT MODE */
 #v-edit{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;display:none;min-height:0}
 #v-edit.on{display:block}
+#v-settings{display:none;flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;min-height:0;padding:1.5rem 1.25rem}
+#v-settings.on{display:block}
+.sett-section{margin-bottom:2rem}
+.sett-title{font-size:10px;letter-spacing:.28em;text-transform:uppercase;color:var(--gold);margin-bottom:1rem}
+.sett-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:.75rem;align-items:center}
+.sett-label{font-size:13px;color:var(--txt2);min-width:180px}
+.sett-value{font-family:var(--serif);font-size:13px;color:var(--txt)}
+.sett-btn{background:none;border:1px solid var(--border);border-radius:6px;padding:6px 14px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--txt2)}
+.sett-btn:hover{background:var(--bg2)}
+.tva-table{width:100%;border-collapse:collapse;font-size:13px;margin-top:.5rem}
+.tva-table th{text-align:left;font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--txt3);padding:6px 8px;border-bottom:1px solid var(--border)}
+.tva-table td{padding:7px 8px;border-bottom:.5px solid var(--border);color:var(--txt)}
+.tva-table td:last-child{color:var(--txt2);font-style:italic}
 .edit-tabs{display:flex;border-bottom:1px solid var(--border);background:var(--bg2);position:sticky;top:0;z-index:1}
 .edit-tab{flex:1;background:none;border:none;border-bottom:2px solid transparent;padding:10px 4px;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--txt2)}
 .edit-tab.on{color:var(--gold);border-bottom-color:var(--gold);font-weight:600}
@@ -212,10 +225,8 @@ button{cursor:pointer}
     <div class="adm-title">Gestion de la carte</div>
     <button class="mode-btn on" id="modeEdit" onclick="setMode('edit')">&#9998; Modifier</button>
     <button class="mode-btn" id="modeChat" onclick="setMode('chat')">&#128172; Assistant IA</button>
-    <button class="adm-pdf-btn" onclick="exportCarte()">&#8659; Export</button>
-    <button class="adm-pdf-btn" onclick="importCarte()">&#8657; Import</button>
+    <button class="mode-btn" id="modeSettings" onclick="setMode('settings')">&#9881; R&eacute;glages</button>
     <button class="adm-pdf-btn" onclick="openPdfModal()">&#8681; PDF A5</button>
-    <button class="adm-pdf-btn" onclick="resetKey()" title="Changer la cl&eacute; API">&#128273;</button>
     <button class="adm-back" onclick="showClient()">&larr; Carte</button>
   </div>
 
@@ -227,6 +238,34 @@ button{cursor:pointer}
       <button class="edit-tab" onclick="swEditTab(2,this)">Digestifs</button>
     </div>
     <div class="edit-body" id="editList"></div>
+  </div>
+
+  <!-- MODE RÉGLAGES -->
+  <div id="v-settings">
+    <div class="sett-section">
+      <div class="sett-title">Cl&eacute; API</div>
+      <div class="sett-row">
+        <span class="sett-label">Cl&eacute; Anthropic active</span>
+        <span class="sett-value" id="sett-key-status">—</span>
+      </div>
+      <div class="sett-row">
+        <button class="sett-btn" onclick="resetKey()">Changer la cl&eacute;</button>
+      </div>
+    </div>
+    <div class="sett-section">
+      <div class="sett-title">Sauvegarde JSON</div>
+      <div class="sett-row">
+        <button class="sett-btn" onclick="exportCarte()">&#8659; Exporter</button>
+        <button class="sett-btn" onclick="importCarte()">&#8657; Importer</button>
+      </div>
+    </div>
+    <div class="sett-section">
+      <div class="sett-title">TVA (usage interne / compta)</div>
+      <table class="tva-table" id="tva-table">
+        <thead><tr><th>R&eacute;f&eacute;rence</th><th>Prix TTC</th><th>HT (TVA 20%)</th><th>HT (TVA 10%)</th></tr></thead>
+        <tbody id="tva-body"></tbody>
+      </table>
+    </div>
   </div>
 
   <!-- MODE CHAT -->
@@ -441,12 +480,30 @@ function doLogin(){
 // MODE ADMIN
 // ============================================================
 function setMode(m){
-  const e=(m==='edit');
+  const e=(m==='edit'), c=(m==='chat'), s=(m==='settings');
   document.getElementById('modeEdit').classList.toggle('on',e);
-  document.getElementById('modeChat').classList.toggle('on',!e);
+  document.getElementById('modeChat').classList.toggle('on',c);
+  document.getElementById('modeSettings').classList.toggle('on',s);
   document.getElementById('v-edit').classList.toggle('on',e);
-  document.getElementById('v-chat').classList.toggle('on',!e);
+  document.getElementById('v-chat').classList.toggle('on',c);
+  document.getElementById('v-settings').classList.toggle('on',s);
   document.getElementById('saveFab').classList.toggle('show',e&&dirty);
+  if(s) renderSettings();
+}
+function renderSettings(){
+  const k=API_KEY;
+  document.getElementById('sett-key-status').textContent=k?'sk-ant-...'+k.slice(-4):'Non configurée';
+  const rows=[];
+  TABS.forEach(t=>{
+    CAT[t].sections.forEach(sec=>{
+      sec.items.forEach(it=>{
+        if(it.price){
+          rows.push(`<tr><td>${it.name}${it.vintage?' '+it.vintage:''}</td><td>${it.price} €</td><td>${(it.price/1.2).toFixed(2)} €</td><td>${(it.price/1.1).toFixed(2)} €</td></tr>`);
+        }
+      });
+    });
+  });
+  document.getElementById('tva-body').innerHTML=rows.join('')||'<tr><td colspan="4" style="color:var(--txt3);font-style:italic">Aucun article avec prix</td></tr>';
 }
 
 // ============================================================
