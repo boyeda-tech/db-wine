@@ -453,7 +453,7 @@ panelsEl.addEventListener('touchend',e=>{
 document.getElementById('hdrEl').addEventListener('click',()=>{
   tapCount++;clearTimeout(tapTimer);
   tapTimer=setTimeout(()=>tapCount=0,1500);
-  if(tapCount>=5){tapCount=0;showLogin()}
+  if(tapCount>=5){tapCount=0;window.open(location.pathname+'?admin','_blank')}
 });
 
 // ============================================================
@@ -578,7 +578,7 @@ function renderEdit(i){
 function getTva(it){return it.tva??(it.nonAlcool?10:20)}
 function updatePrice(id,val){const it=findItem(id);if(it){it.p=parseFloat(val)||it.p;markDirty()}}
 function updateDispo(id,val){const it=findItem(id);if(it){it.dispo=val;markDirty()}}
-function updateTva(id,val){const it=findItem(id);if(it){it.tva=parseFloat(val);markDirty();renderSettings()}}
+function updateTva(id,val){const it=findItem(id);if(it){it.tva=parseFloat(val);markDirty();renderSettings();renderEdit(editTab)}}
 function markDirty(){dirty=true;document.getElementById('saveFab').classList.add('show')}
 function saveChanges(){save();renderAll();dirty=false;document.getElementById('saveFab').classList.remove('show');toast('Modifications enregistrées ✓')}
 
@@ -1001,6 +1001,7 @@ function apiH(){
   const sbPass=await sbLoadSetting('db_wine_pass');
   if(sbPass){PASS=sbPass;localStorage.setItem('db_wine_pass',sbPass);}
   loadKey();renderAll();
+  if(location.search.includes('admin'))showLogin();
 })();
 </script>
 </body>
