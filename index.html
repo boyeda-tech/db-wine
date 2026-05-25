@@ -273,7 +273,7 @@ button{cursor:pointer}
     <div class="sett-section">
       <div class="sett-title">TVA (usage interne / compta)</div>
       <table class="tva-table" id="tva-table">
-        <thead><tr><th>R&eacute;f&eacute;rence</th><th>Prix TTC</th><th>HT (TVA 20%)</th><th>HT (TVA 10%)</th></tr></thead>
+        <thead><tr><th>R&eacute;f&eacute;rence</th><th>Prix TTC</th><th>TVA</th><th>Prix HT</th></tr></thead>
         <tbody id="tva-body"></tbody>
       </table>
     </div>
@@ -331,6 +331,10 @@ button{cursor:pointer}
    <div class="frow"><label>Degr&eacute; alcool</label><input id="fd" placeholder="13% vol"></div>
   </div>
   <div class="frow"><label>Section *</label><select id="fsec"></select></div>
+  <div class="frow" style="align-items:center;gap:10px">
+   <input type="checkbox" id="fna" style="width:16px;height:16px;accent-color:var(--gold)">
+   <label style="font-size:12px;color:var(--txt2);cursor:pointer" for="fna">Non alcoolisé (TVA 10% au lieu de 20%)</label>
+  </div>
   <div class="ai-status" id="aiSt"></div>
   <div class="modal-btns">
    <button class="btn-cancel" onclick="closeAdd()">Annuler</button>
@@ -525,7 +529,9 @@ function renderSettings(){
       lists.forEach(items=>items.forEach(it=>{
         if(it.p){
           const px=it.p%1===0?it.p:parseFloat(it.p).toFixed(2);
-          rows.push(`<tr><td>${it.n}${it.v?' '+it.v:''}</td><td>${px} €</td><td>${(it.p/1.2).toFixed(2)} €</td><td>${(it.p/1.1).toFixed(2)} €</td></tr>`);
+          const rate=it.nonAlcool?10:20;
+          const ht=(it.p/(1+rate/100)).toFixed(2);
+          rows.push(`<tr><td>${it.n}${it.v?' '+it.v:''}</td><td>${px} €</td><td>${rate}%</td><td>${ht} €</td></tr>`);
         }
       }));
     });
@@ -635,7 +641,8 @@ async function saveNewItem(){
     v:document.getElementById('fv').value.trim()||null,
     fmt:document.getElementById('ff').value.trim()||null,
     p:prix,degre:document.getElementById('fd').value.trim()||null,
-    region:null,cepage:null,prod:null,note:null,accord:null,tourbe:null,dispo:true
+    region:null,cepage:null,prod:null,note:null,accord:null,tourbe:null,
+    nonAlcool:document.getElementById('fna').checked,dispo:true
   };
   const t=JSON.parse(document.getElementById('fsec').value);
   const tab=CAT[t.key];const sec=tab.sections[t.si];
@@ -881,7 +888,7 @@ function execAction(a){
   else if(a.type==='add'){
     const tabKey=a.tab||'vins';const tab=CAT[tabKey];if(!tab)return;
     let sec=tab.sections.find(s=>s.id===a.secId)||tab.sections[0];if(!sec)return;
-    const newItem={id:'item-'+Date.now(),n:a.nom||'Nouveau',v:a.v||null,fmt:a.fmt||null,p:parseFloat(a.p)||0,degre:null,region:null,cepage:null,prod:null,note:null,accord:null,tourbe:null,dispo:true};
+    const newItem={id:'item-'+Date.now(),n:a.nom||'Nouveau',v:a.v||null,fmt:a.fmt||null,p:parseFloat(a.p)||0,degre:null,region:null,cepage:null,prod:null,note:null,accord:null,tourbe:null,nonAlcool:a.nonAlcool||false,dispo:true};
     if(sec.subsections&&sec.subsections.length>0){sec.subsections[0].items.push(newItem);}else{sec.items.push(newItem);}
     save();renderAll();renderEdit(editTab);
     addMsg('sys','✓ "'+newItem.n+'" ajouté. Enrichissement de la fiche en cours...');
