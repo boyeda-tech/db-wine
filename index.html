@@ -243,6 +243,17 @@ button{cursor:pointer}
   <!-- MODE RÉGLAGES -->
   <div id="v-settings">
     <div class="sett-section">
+      <div class="sett-title">Mot de passe</div>
+      <div class="sett-row">
+        <input type="password" id="sett-pw1" placeholder="Nouveau mot de passe" style="flex:1;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;background:var(--bg)">
+        <input type="password" id="sett-pw2" placeholder="Confirmer" style="flex:1;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;background:var(--bg)">
+      </div>
+      <div class="sett-row">
+        <button class="sett-btn" onclick="changePass()">Mettre &agrave; jour</button>
+        <span id="sett-pw-msg" style="font-size:12px;color:var(--txt2)"></span>
+      </div>
+    </div>
+    <div class="sett-section">
       <div class="sett-title">Cl&eacute; API</div>
       <div class="sett-row">
         <span class="sett-label">Cl&eacute; Anthropic active</span>
@@ -356,7 +367,7 @@ const DATA={aperitifs:{label:"Apéritifs & Vins au verre",sections:[{id:"ap1",ti
 let CAT=JSON.parse(JSON.stringify(DATA));
 let curTab=0,editTab=0,openId=null,hist=[],dirty=false,tapCount=0,tapTimer=null;
 const TABS=['aperitifs','vins','digestifs'];
-const PASS='atelier';
+let PASS=localStorage.getItem('db_wine_pass')||'atelier';
 
 /* ── Supabase ── */
 const SB_URL='https://wtjjmwokiehfyakwbqtn.supabase.co';
@@ -489,6 +500,20 @@ function setMode(m){
   document.getElementById('v-settings').classList.toggle('on',s);
   document.getElementById('saveFab').classList.toggle('show',e&&dirty);
   if(s) renderSettings();
+}
+function changePass(){
+  const p1=document.getElementById('sett-pw1').value.trim();
+  const p2=document.getElementById('sett-pw2').value.trim();
+  const msg=document.getElementById('sett-pw-msg');
+  if(!p1){msg.textContent='Entrez un nouveau mot de passe';return;}
+  if(p1!==p2){msg.textContent='Les mots de passe ne correspondent pas';return;}
+  PASS=p1;
+  localStorage.setItem('db_wine_pass',p1);
+  sbSaveSetting('db_wine_pass',p1);
+  document.getElementById('sett-pw1').value='';
+  document.getElementById('sett-pw2').value='';
+  msg.textContent='Mot de passe mis à jour ✓';
+  setTimeout(()=>msg.textContent='',3000);
 }
 function renderSettings(){
   const k=API_KEY;
@@ -961,6 +986,8 @@ function apiH(){
   const sbData=await sbLoad('db-wine');
   if(sbData?._updatedAt>(CAT._updatedAt||0)){CAT=sbData;localStorage.setItem('ap-cat',JSON.stringify(CAT));}
   if(!API_KEY){const k=await sbLoadSetting('claude_api_key');if(k){API_KEY=k;localStorage.setItem('ap-apikey',k);}}
+  const sbPass=await sbLoadSetting('db_wine_pass');
+  if(sbPass){PASS=sbPass;localStorage.setItem('db_wine_pass',sbPass);}
   loadKey();renderAll();
 })();
 </script>
