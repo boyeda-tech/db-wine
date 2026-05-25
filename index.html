@@ -51,6 +51,8 @@ button{cursor:pointer}
 .fi-note{grid-column:1/-1;font-family:var(--serif);font-size:13px;font-style:italic;color:var(--txt2);border-top:.5px solid var(--border);padding-top:8px;margin-top:4px;line-height:1.65}
 .fi-accord{grid-column:1/-1;font-size:11px;color:var(--gold);margin-top:5px}
 .fi-accord strong{font-weight:600}
+.pa-input{border:none;border-bottom:1px dashed var(--gold);background:transparent;color:var(--txt2);font:inherit;font-style:italic;font-size:11px;width:calc(100% - 4px);padding:0;cursor:text}
+.pa-input:focus{outline:none;border-bottom-color:var(--gold-light)}
 .badge{display:inline-block;font-size:9px;letter-spacing:.1em;padding:2px 8px;border-radius:20px;border:.5px solid}
 .badge-t{border-color:#9E9C95;color:#444441;background:#F1EFE8}
 .badge-n{border-color:var(--green);color:var(--green);background:var(--green-bg)}
@@ -421,7 +423,7 @@ function renderFiche(it){
   if(it.tourbe!=null){const cls=it.tourbe.includes('Non')?'badge-n':'badge-t';h+=`<div class="fi"><label>Tourbé</label><span class="badge ${cls}">${it.tourbe}</span></div>`}
   if(it.note)h+=`<div class="fi-note">${it.note}</div>`;
   if(it.accord)h+=`<div class="fi-accord"><strong>Accord :</strong> ${it.accord}</div>`;
-  if(it.platAccords?.length){h+=`<div class="fi-accord" style="margin-top:6px"><strong>À la carte :</strong><ul style="margin:4px 0 0 1.2em;padding:0;list-style:disc">${it.platAccords.map(p=>`<li style="margin-bottom:3px"><em>${p.platName}</em> — ${p.accord}</li>`).join('')}</ul></div>`;}
+  if(it.platAccords?.length){h+=`<div class="fi-accord" style="margin-top:6px"><strong>À la carte :</strong><ul style="margin:4px 0 0 1.2em;padding:0;list-style:disc">${it.platAccords.map((p,pi)=>`<li style="margin-bottom:5px"><em>${p.platName}</em><br><input class="pa-input" value="${(p.accord||'').replace(/"/g,'&quot;')}" onblur="savePlatAccord('${it.id}',${pi},this.value)" placeholder="Accord…"></li>`).join('')}</ul></div>`;}
   h+=`</div>`;
   return h;
 }
@@ -577,6 +579,15 @@ function renderEdit(i){
 }
 
 function getTva(it){return it.tva??(it.nonAlcool?10:20)}
+function savePlatAccord(wineId,pIdx,newText){
+  ['aperitifs','vins','digestifs'].forEach(k=>{
+    const tab=CAT[k];if(!tab)return;
+    tab.sections.forEach(sec=>{
+      const lists=sec.subsections?sec.subsections.map(s=>s.items):[sec.items];
+      lists.forEach(items=>{const it=items.find(x=>x.id===wineId);if(it?.platAccords?.[pIdx]){it.platAccords[pIdx].accord=newText.trim();save();}});
+    });
+  });
+}
 function updatePrice(id,val){const it=findItem(id);if(it){it.p=parseFloat(val)||it.p;markDirty()}}
 function updateDispo(id,val){const it=findItem(id);if(it){it.dispo=val;markDirty()}}
 function updateTva(id,val){const it=findItem(id);if(it){it.tva=parseFloat(val);markDirty();renderSettings();renderEdit(editTab)}}
