@@ -1103,16 +1103,17 @@ function apiH(){
     'anthropic-dangerous-direct-browser-access':'true'
   };
 }
-// INIT
+// INIT — affichage immédiat
+load();loadKey();renderAll();
+if(location.search.includes('admin'))showLogin();
+
+// Sync Supabase en arrière-plan
 (async()=>{
-  load();
   const sbData=await sbLoad('db-wine');
-  if(sbData?._updatedAt>(CAT._updatedAt||0)){CAT=sbData;localStorage.setItem('ap-cat',JSON.stringify(CAT));}
-  if(!API_KEY){const k=await sbLoadSetting('claude_api_key');if(k){API_KEY=k;localStorage.setItem('ap-apikey',k);}}
+  if(sbData?._updatedAt>(CAT._updatedAt||0)){CAT=sbData;localStorage.setItem('ap-cat',JSON.stringify(CAT));renderAll();}
+  if(!API_KEY){const k=await sbLoadSetting('claude_api_key');if(k){API_KEY=k;localStorage.setItem('ap-apikey',k);document.getElementById('keyModal').style.display='none';}}
   const sbPass=await sbLoadSetting('db_wine_pass');
   if(sbPass){PASS=sbPass;localStorage.setItem('db_wine_pass',sbPass);}
-  loadKey();renderAll();
-  if(location.search.includes('admin'))showLogin();
   const carteTs=await sbLoadSetting('carte_last_updated');
   const syncTs=parseInt(localStorage.getItem('accords_synced_at')||'0');
   if(carteTs&&parseInt(carteTs)>syncTs){
